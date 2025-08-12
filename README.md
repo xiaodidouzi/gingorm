@@ -1,2 +1,1 @@
-# -gingrom-
 # gingorm
