@@ -7,4 +7,5 @@ type Article struct {
 	Title   string `binding:"required"`
 	Content string `binding:"required"`
 	Preview string `binding:"required"`
+	Likes   int64  `json:"likes"`
 }

@@ -10,6 +10,7 @@ import (
 
 func SetupRouter() *gin.Engine {
 	r := gin.Default()
+	r.Use(middlewares.LoggerMiddleware())
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"https://localhost:5173"},
 		AllowMethods:     []string{"GET", "POST", "OPTIONS"},

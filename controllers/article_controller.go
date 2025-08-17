@@ -3,6 +3,7 @@ package controllers
 import (
 	"awesomeProject/global"
 	"awesomeProject/models"
+	"awesomeProject/utils"
 	"encoding/json"
 	"errors"
 	"github.com/gin-gonic/gin"
@@ -17,57 +18,49 @@ var cacheKey = "articles"
 func CreateArticle(ctx *gin.Context) {
 	var article models.Article
 	if err := ctx.ShouldBindJSON(&article); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	if err := global.DB.AutoMigrate(&article); err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		utils.RespondError(ctx, http.StatusBadRequest, err.Error())
 		return
 	}
 	if err := global.DB.Create(&article).Error; err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		utils.RespondError(ctx, http.StatusInternalServerError, err.Error())
 		return
 	}
 	if err := global.RedisDB.Del(ctx, cacheKey).Err(); err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+		utils.RespondError(ctx, http.StatusInternalServerError, err.Error())
 	}
 	ctx.JSON(http.StatusOK, article)
 }
 func GetArticle(ctx *gin.Context) {
 	cachedData, err := global.RedisDB.Get(ctx, cacheKey).Result()
-	if err == redis.Nil {
+	if errors.Is(err, redis.Nil) {
 		var articles []models.Article
-		if err := global.DB.Find(&articles).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-			} else {
-				ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			}
+		if err = global.DB.Find(&articles).Error; err != nil {
+			utils.RespondError(ctx, http.StatusInternalServerError, err.Error())
 			return
 		}
 		articleJSON, err := json.Marshal(articles)
 		if err != nil {
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			utils.RespondError(ctx, http.StatusInternalServerError, err.Error())
 			return
 		}
 		if err := global.RedisDB.Set(ctx, cacheKey, articleJSON, 10*time.Minute).Err(); err != nil {
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			utils.RespondError(ctx, http.StatusInternalServerError, err.Error())
 			return
 		}
 		ctx.JSON(http.StatusOK, articles)
-
-	} else if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
-	} else {
-		var articles []models.Article
-		if err := json.Unmarshal([]byte(cachedData), &articles); err != nil {
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		ctx.JSON(http.StatusOK, articles)
 	}
+	if err != nil {
+		utils.RespondError(ctx, http.StatusInternalServerError, err.Error())
+		return
+	}
+	var articles []models.Article
+	if err := json.Unmarshal([]byte(cachedData), &articles); err != nil {
+		utils.RespondError(ctx, http.StatusInternalServerError, err.Error())
+		return
+	}
+	ctx.JSON(http.StatusOK, articles)
+
 }
 
 func GetArticleByID(ctx *gin.Context) {
@@ -75,9 +68,9 @@ func GetArticleByID(ctx *gin.Context) {
 	var article models.Article
 	if err := global.DB.Where("id=?", id).First(&article).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			ctx.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			utils.RespondError(ctx, http.StatusNotFound, "article not found")
 		} else {
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			utils.RespondError(ctx, http.StatusInternalServerError, err.Error())
 		}
 		return
 	}

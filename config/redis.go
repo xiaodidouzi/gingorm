@@ -17,7 +17,7 @@ func InitRedis() {
 		Password: password,
 	})
 	ctx := context.Background()
-	_, err := RedisClient.Ping(ctx).Result()
+	err := RedisClient.Ping(ctx).Err()
 	if err != nil {
 		log.Fatalf("Failed to connect to Redis,get error:%v", err)
 	}

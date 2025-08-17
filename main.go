@@ -3,6 +3,7 @@ package main
 import (
 	"awesomeProject/config"
 	"awesomeProject/router"
+	"awesomeProject/tasks"
 	"context"
 	"log"
 	"net/http"
@@ -18,7 +19,7 @@ func main() {
 		Addr:    ":8080",
 		Handler: r,
 	}
-
+	tasks.StartLikesSyncTicker()
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("listen: %s\n", err)
