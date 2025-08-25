@@ -10,17 +10,18 @@ func AuthMiddleWare() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		token := ctx.GetHeader("Authorization")
 		if token == "" {
-			ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Missing Authorization"})
+			utils.RespondError(ctx, http.StatusUnauthorized, "Missing Authorization")
 			ctx.Abort()
 			return
 		}
-		username, err := utils.ParseJWT(token)
+		userID, username, err := utils.ParseJWT(token)
 		if err != nil {
-			ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+			utils.RespondError(ctx, http.StatusUnauthorized, "Invalid token")
 			ctx.Abort()
 			return
 		}
 		ctx.Set("username", username)
+		ctx.Set("userID", userID)
 		ctx.Next()
 	}
 }

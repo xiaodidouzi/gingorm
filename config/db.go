@@ -23,5 +23,5 @@ func InitDB() {
 	sqlDB.SetMaxOpenConns(AppConfig.Database.MaxOpenConns)
 	sqlDB.SetConnMaxLifetime(time.Hour)
 	global.DB = db
-	_ = global.DB.AutoMigrate(&models.User{}, &models.Article{}, &models.ExchangeRate{})
+	_ = global.DB.AutoMigrate(&models.User{}, &models.Article{}, &models.ExchangeRate{}, &models.Like{})
 }

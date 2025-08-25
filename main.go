@@ -2,6 +2,7 @@ package main
 
 import (
 	"awesomeProject/config"
+	"awesomeProject/kafka"
 	"awesomeProject/router"
 	"awesomeProject/tasks"
 	"context"
@@ -14,12 +15,16 @@ import (
 
 func main() {
 	config.InitConfig()
+	kafka.InitKafkaWriter([]string{"localhost:9092"}, "like-topic")
+	defer kafka.CloseKafkaWriter()
 	r := router.SetupRouter()
+	tasks.StartLikesSyncTicker()
+	go kafka.StartLikeConsumer([]string{"localhost:9092"}, "like-topic", "like-group")
 	srv := &http.Server{
 		Addr:    ":8080",
 		Handler: r,
 	}
-	tasks.StartLikesSyncTicker()
+
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("listen: %s\n", err)
@@ -37,5 +42,4 @@ func main() {
 		log.Fatal("Server Shutdown:", err)
 	}
 	log.Println("Server exiting")
-	r.Run(config.AppConfig.App.Port)
 }

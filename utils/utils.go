@@ -16,15 +16,16 @@ func CheckPassword(password, hash string) bool {
 	return err == nil
 
 }
-func GenerateJWT(username string) (string, error) {
+func GenerateJWT(userID int, username string) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"userID":   userID,
 		"username": username,
 		"exp":      time.Now().Add(time.Hour * 72).Unix(),
 	})
 	signedToken, err := token.SignedString([]byte("secret"))
 	return "Bearer " + signedToken, err
 }
-func ParseJWT(tokenString string) (string, error) {
+func ParseJWT(tokenString string) (int, string, error) {
 	if tokenString[:7] == "Bearer " && len(tokenString) > 7 {
 		tokenString = tokenString[7:]
 	}
@@ -35,14 +36,15 @@ func ParseJWT(tokenString string) (string, error) {
 		return []byte("secret"), nil
 	})
 	if err != nil {
-		return "", err
+		return 0, "", err
 	}
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 		username, ok := claims["username"].(string)
+		userID := int(claims["userID"].(float64))
 		if !ok {
-			return "", errors.New("username claims is not a string")
+			return 0, "", errors.New("username claims is not a string")
 		}
-		return username, nil
+		return userID, username, nil
 	}
-	return "", err
+	return 0, "", err
 }

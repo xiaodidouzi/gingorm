@@ -1,4 +1,4 @@
-package controllers
+package v1
 
 import (
 	"awesomeProject/global"
@@ -51,7 +51,7 @@ func Login(ctx *gin.Context) {
 		utils.RespondError(ctx, http.StatusUnauthorized, "用户名或密码错误")
 		return
 	}
-	token, err := utils.GenerateJWT(user.Username)
+	token, err := utils.GenerateJWT(int(user.ID), user.Username)
 	if err != nil {
 		utils.RespondError(ctx, http.StatusInternalServerError, err.Error())
 		return

@@ -1,7 +1,8 @@
 package router
 
 import (
-	"awesomeProject/controllers"
+	v1 "awesomeProject/api/v1"
+	v2 "awesomeProject/api/v2"
 	"awesomeProject/middlewares"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -22,30 +23,39 @@ func SetupRouter() *gin.Engine {
 		//},
 		MaxAge: 12 * time.Hour,
 	}))
-
-	auth := r.Group("/api/auth")
+	// v1 auth
+	auth := r.Group("/api/v1/auth")
 	{
-		auth.POST("/login", controllers.Login)
-		auth.POST("/register", controllers.Register)
+		auth.POST("/login", v1.Login)
+		auth.POST("/register", v1.Register)
 	}
-	api := r.Group("/api")
-	api.GET("/exchangeRates", controllers.GetExchange)
-	article := api.Group("/article")
+	// v1 article
+	article := r.Group("api/v1/articles")
 	{
-		article.POST("", controllers.CreateArticle)
-		article.GET("/:id", controllers.GetArticleByID)
-		article.GET("", controllers.GetArticle)
+		article.POST("", v1.CreateArticle)
+		article.GET("/:id", v1.GetArticleByID)
+		article.GET("", v1.GetArticle)
 		like := article.Group("/:id/like")
 		{
-			like.POST("", controllers.LikeArticle)
-			like.GET("", controllers.GetArticleLikes)
+			like.POST("", v1.LikeArticle)
+			like.GET("", v1.GetArticleLikes)
 		}
 	}
-
-	authRequest := api.Group("")
-	authRequest.Use(middlewares.AuthMiddleWare())
+	//v2 article likes kafka
+	v2Article := r.Group("api/v2/articles")
+	v2Article.Use(middlewares.AuthMiddleWare())
 	{
-		authRequest.POST("/exchangeRates", controllers.CreateExchangeRate)
+		v2Article.POST("/:id/like", v2.LikeArticle)
+	}
+	// v1 exchange rates
+	exchange := r.Group("/api/v1/exchangeRates")
+	{
+		exchange.GET("", v1.GetExchange)
+		// 需要鉴权
+		exchangeAuth := exchange.Use(middlewares.AuthMiddleWare())
+		{
+			exchangeAuth.POST("", v1.CreateExchangeRate)
+		}
 	}
 	return r
 }
