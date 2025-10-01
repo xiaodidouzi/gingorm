@@ -1,12 +1,14 @@
 module awesomeProject
 
-go 1.24
+go 1.25
+
 
 require (
 	github.com/gin-contrib/cors v1.7.6
 	github.com/gin-gonic/gin v1.10.1
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/golang-jwt/jwt/v4 v4.5.2
+	github.com/segmentio/kafka-go v0.4.48
 	github.com/spf13/viper v1.20.1
 	golang.org/x/crypto v0.39.0
 	gorm.io/driver/mysql v1.6.0
@@ -42,7 +44,6 @@ require (
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/pierrec/lz4/v4 v4.1.15 // indirect
 	github.com/sagikazarmark/locafero v0.7.0 // indirect
-	github.com/segmentio/kafka-go v0.4.48 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spf13/afero v1.12.0 // indirect
 	github.com/spf13/cast v1.7.1 // indirect
