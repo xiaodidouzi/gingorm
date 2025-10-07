@@ -1,68 +1,66 @@
 package kafka
 
 import (
-	"context"
 	"encoding/json"
-	"errors"
-	"fmt"
-	"gorm.io/gorm"
+	"gingorm/models"
+	"gingorm/service/dto"
 	"log"
 
-	"awesomeProject/global"
-	"awesomeProject/models"
-
-	"github.com/segmentio/kafka-go"
+	"github.com/IBM/sarama"
+	"gorm.io/gorm"
 )
 
-func StartLikeConsumer(brokers []string, topic, groupID string) {
-	r := kafka.NewReader(kafka.ReaderConfig{
-		Brokers:  brokers,
-		Topic:    topic,
-		GroupID:  groupID, // 消费组ID
-		MinBytes: 10e3,    // 10KB
-		MaxBytes: 10e6,    // 10MB
-	})
+type LikeConsumer struct {
+	db    *gorm.DB
+	topic string
+}
 
-	log.Println("Kafka Like Consumer started...")
+func NewLikeConsumer(db *gorm.DB, topic string) *LikeConsumer {
+	return &LikeConsumer{db: db, topic: topic}
+}
 
-	for {
-		m, err := r.ReadMessage(context.Background())
-		if err != nil {
-			log.Printf("Error reading message: %v", err)
-			continue
-		}
-
-		var msg LikeMessage
-		if err := json.Unmarshal(m.Value, &msg); err != nil {
-			log.Printf("Invalid message format: %v", err)
-			continue
-		}
-		err = global.DB.Transaction(func(tx *gorm.DB) error {
-			like := models.Like{
-				ArticleID: msg.ArticleID,
-				UserID:    msg.UserID,
-			}
-			if err := global.DB.Create(&like).Error; err != nil {
-				if errors.Is(err, gorm.ErrDuplicatedKey) {
-					log.Printf("Duplicate like ignored: ArticleID=%d UserID=%d", msg.ArticleID, msg.UserID)
-					return nil
-				}
-				return err
-			}
-			if err := tx.Model(&models.Article{}).Where("id=?", msg.ArticleID).
-				UpdateColumn("likes", gorm.Expr("likes+?", 1)).Error; err != nil {
-				return err
-			}
-			likeKey := fmt.Sprintf("like:%d:%d", msg.ArticleID, msg.UserID)
-			if err := global.RedisDB.Set(context.Background(), likeKey, 1, 0).Err(); err != nil {
-				log.Printf("Redis update failed: %v", err)
-			}
-			return nil
-		})
-		if err != nil {
-			log.Printf("Transaction failed for ArticleID=%d UserID=%d: %v", msg.ArticleID, msg.UserID, err)
-		} else {
-			log.Printf("Like saved & Article.Likes updated: ArticleID=%d UserID=%d", msg.ArticleID, msg.UserID)
-		}
+func (c *LikeConsumer) Start(brokers []string) error {
+	consumer, err := sarama.NewConsumer(brokers, nil)
+	if err != nil {
+		return err
 	}
+	defer consumer.Close()
+
+	partitions, _ := consumer.Partitions(c.topic)
+	for _, partition := range partitions {
+		pc, _ := consumer.ConsumePartition(c.topic, partition, sarama.OffsetNewest)
+		go func(pc sarama.PartitionConsumer) {
+			for msg := range pc.Messages() {
+				var m dto.LikeMessage
+				if err := json.Unmarshal(msg.Value, &m); err != nil {
+					log.Println("[ERROR] invalid like message:", err)
+					continue
+				}
+
+				switch m.Action {
+				case "like":
+					// 幂等插入
+					if err := c.db.Exec(`
+						INSERT INTO likes (user_id, target_id, target_type, created_at, updated_at)
+						VALUES (?, ?, ?, NOW(), NOW())
+						ON DUPLICATE KEY UPDATE updated_at = NOW()
+					`, m.UserID, m.TargetID, m.TargetType).Error; err != nil {
+						log.Printf("[Consumer] failed to insert like: %v", err)
+					} else {
+						log.Printf("[Consumer] like inserted: %+v", m)
+					}
+
+				case "unlike":
+					// 删除操作
+					if err := c.db.Where("user_id = ? AND target_id = ? AND target_type = ?", m.UserID, m.TargetID, m.TargetType).
+						Delete(&models.Like{}).Error; err != nil {
+						log.Printf("[Consumer] failed to delete like: %v", err)
+					} else {
+						log.Printf("[Consumer] like deleted: %+v", m)
+					}
+				}
+			}
+		}(pc)
+	}
+	select {} // 阻塞主线程
 }

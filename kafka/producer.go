@@ -3,48 +3,42 @@ package kafka
 import (
 	"context"
 	"encoding/json"
-	"github.com/segmentio/kafka-go"
+	"errors"
+	"github.com/IBM/sarama"
 	"log"
-	"time"
 )
 
-type LikeMessage struct {
-	ArticleID int `json:"article_id"`
-	UserID    int `json:"user_id"`
+type Producer struct {
+	asyncProducer sarama.AsyncProducer
+	topic         string
 }
 
-var Writer *kafka.Writer
-
-func InitKafkaWriter(brokers []string, topic string) {
-	Writer = &kafka.Writer{
-		Addr:     kafka.TCP(brokers...),
-		Topic:    topic,
-		Balancer: &kafka.LeastBytes{},
+func NewProducer(brokers []string, topic string) (*Producer, error) {
+	config := sarama.NewConfig()
+	config.Producer.Return.Successes = false
+	config.Producer.RequiredAcks = sarama.WaitForLocal
+	producer, err := sarama.NewAsyncProducer(brokers, config)
+	if err != nil {
+		return nil, err
 	}
+
+	return &Producer{asyncProducer: producer, topic: topic}, nil
 }
 
-func SendLikeMessage(articleID, userID int) error {
-	msg := LikeMessage{
-		ArticleID: articleID,
-		UserID:    userID,
-	}
+func (p *Producer) SendMessage(ctx context.Context, msg interface{}) error {
 	data, err := json.Marshal(msg)
 	if err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := Writer.WriteMessages(ctx, kafka.Message{Value: data}); err != nil {
-		log.Printf("Kafka send failed: ArticleID=%d UserID=%d, err=%v", articleID, userID, err)
-		return err
-	}
 
-	log.Printf("Kafka message sent: ArticleID=%d UserID=%d", articleID, userID)
-	return nil
-}
-
-func CloseKafkaWriter() {
-	if Writer != nil {
-		_ = Writer.Close()
+	select {
+	case p.asyncProducer.Input() <- &sarama.ProducerMessage{
+		Topic: p.topic,
+		Value: sarama.ByteEncoder(data),
+	}:
+		log.Printf("[INFO] Kafka message sent: %+v", msg)
+		return nil
+	case <-ctx.Done():
+		return errors.New("send kafka message canceled or timeout: " + ctx.Err().Error())
 	}
 }

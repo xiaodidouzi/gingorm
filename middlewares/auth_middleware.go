@@ -1,7 +1,7 @@
 package middlewares
 
 import (
-	"awesomeProject/utils"
+	"gingorm/utils"
 	"github.com/gin-gonic/gin"
 	"net/http"
 )
@@ -21,7 +21,7 @@ func AuthMiddleWare() gin.HandlerFunc {
 			return
 		}
 		ctx.Set("username", username)
-		ctx.Set("userID", userID)
+		ctx.Set("userID", uint(userID))
 		ctx.Next()
 	}
 }

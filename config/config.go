@@ -1,31 +1,40 @@
 package config
 
-//导入viper
 import (
 	"github.com/spf13/viper"
 	"log"
 )
 
+// 配置结构体
 type Config struct {
 	App struct {
-		Name string
-		Port string
-	}
+		Name string `mapstructure:"name"`
+		Port string `mapstructure:"port"`
+	} `mapstructure:"app"`
+
 	Database struct {
-		Dsn          string
-		MaxIdleConns int
-		MaxOpenConns int
-	}
+		Dsn          string `mapstructure:"dsn"`
+		MaxIdleConns int    `mapstructure:"maxidleconns"`
+		MaxOpenConns int    `mapstructure:"maxopenconns"`
+	} `mapstructure:"database"`
+
 	Redis struct {
-		Addr     string
-		DB       int
-		Password string
-	}
+		Addr     string `mapstructure:"addr"`
+		DB       int    `mapstructure:"db"`
+		Password string `mapstructure:"password"`
+	} `mapstructure:"redis"`
+
+	JWT struct {
+		Secret string `mapstructure:"secret"`
+		Expire int    `mapstructure:"expire"`
+	} `mapstructure:"jwt"`
 }
 
+// 初始化配置
 var AppConfig *Config
 
 func InitConfig() {
+	//
 	viper.SetConfigName("config")
 	viper.SetConfigType("yml")
 	viper.AddConfigPath("./config")
@@ -38,4 +47,5 @@ func InitConfig() {
 	}
 	InitDB()
 	InitRedis()
+
 }

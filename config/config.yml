@@ -1,15 +1,17 @@
-
-
 app:
   name: CurrencyExchangeApp
   port: :8080
+
 database:
   dsn: "root:123456@tcp(127.0.0.1:13306)/exchange?charset=utf8mb4&parseTime=True&loc=Local"
-  MaxIdleConns: 10
-  MaxOpenConns: 100
+  maxidleconns: 10
+  maxopenconns: 100
+
 redis:
   addr: "localhost:6379"
-  DB: 0
-  Password: ""
+  db: 0
+  password: ""
 
-
+jwt:
+  secret: "secret"
+  expire: 86400

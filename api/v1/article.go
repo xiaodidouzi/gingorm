@@ -1,78 +1,107 @@
 package v1
 
 import (
-	"awesomeProject/global"
-	"awesomeProject/models"
-	"awesomeProject/utils"
-	"encoding/json"
-	"errors"
+	"gingorm/service"
+	"gingorm/service/dto"
+	"gingorm/utils"
 	"github.com/gin-gonic/gin"
-	"github.com/go-redis/redis/v8"
-	"gorm.io/gorm"
 	"net/http"
-	"time"
+	"strconv"
 )
 
-var cacheKey = "articles"
+type ArticleAPI struct {
+	articleService *service.ArticleService
+}
 
-func CreateArticle(ctx *gin.Context) {
-	var article models.Article
-	if err := ctx.ShouldBindJSON(&article); err != nil {
+func NewArticleAPI(articleService *service.ArticleService) *ArticleAPI {
+	return &ArticleAPI{
+		articleService: articleService}
+}
+
+// 创建文章
+func (a *ArticleAPI) CreateArticle(ctx *gin.Context) {
+	var req dto.CreateArticleRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
 		utils.RespondError(ctx, http.StatusBadRequest, err.Error())
 		return
 	}
-	if err := global.DB.Create(&article).Error; err != nil {
-		utils.RespondError(ctx, http.StatusInternalServerError, err.Error())
-		return
-	}
-	if err := global.RedisDB.Del(ctx, cacheKey).Err(); err != nil {
-		utils.RespondError(ctx, http.StatusInternalServerError, err.Error())
-	}
-	ctx.JSON(http.StatusOK, article)
-}
-func GetArticle(ctx *gin.Context) {
-	cachedData, err := global.RedisDB.Get(ctx, cacheKey).Result()
-	if errors.Is(err, redis.Nil) {
-		var articles []models.Article
-		if err = global.DB.Find(&articles).Error; err != nil {
-			utils.RespondError(ctx, http.StatusInternalServerError, err.Error())
-			return
-		}
-		articleJSON, err := json.Marshal(articles)
-		if err != nil {
-			utils.RespondError(ctx, http.StatusInternalServerError, err.Error())
-			return
-		}
-		if err := global.RedisDB.Set(ctx, cacheKey, articleJSON, 10*time.Minute).Err(); err != nil {
-			utils.RespondError(ctx, http.StatusInternalServerError, err.Error())
-			return
-		}
-		ctx.JSON(http.StatusOK, articles)
-		return
-	}
+	//获取当前用户ID
+	authorID := ctx.MustGet("userID").(uint)
+	res, err := a.articleService.CreateArticle(req, authorID)
 	if err != nil {
 		utils.RespondError(ctx, http.StatusInternalServerError, err.Error())
 		return
 	}
-	var articles []models.Article
-	if err := json.Unmarshal([]byte(cachedData), &articles); err != nil {
+	utils.RespondSuccess(ctx, res)
+}
+
+// 获取文章详情
+func (a *ArticleAPI) GetArticle(ctx *gin.Context) {
+	//获取文章ID
+	idStr := ctx.Param("id")
+	articleID, err := strconv.Atoi(idStr)
+	if err != nil {
+		utils.RespondError(ctx, http.StatusBadRequest, err.Error())
+		return
+	}
+	res, err := a.articleService.GetArticle(uint(articleID))
+	if err != nil {
 		utils.RespondError(ctx, http.StatusInternalServerError, err.Error())
 		return
 	}
-	ctx.JSON(http.StatusOK, articles)
-
+	utils.RespondSuccess(ctx, res)
 }
 
-func GetArticleByID(ctx *gin.Context) {
-	id := ctx.Param("id")
-	var article models.Article
-	if err := global.DB.Where("id=?", id).First(&article).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			utils.RespondError(ctx, http.StatusNotFound, "article not found")
-		} else {
-			utils.RespondError(ctx, http.StatusInternalServerError, err.Error())
-		}
+// 分页查询文章列表
+func (a *ArticleAPI) ListArticles(ctx *gin.Context) {
+	var req dto.ListArticlesRequest
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		utils.RespondError(ctx, http.StatusBadRequest, err.Error())
 		return
 	}
-	ctx.JSON(http.StatusOK, article)
+	res, err := a.articleService.ListArticles(req)
+	if err != nil {
+		utils.RespondError(ctx, http.StatusInternalServerError, err.Error())
+		return
+	}
+	utils.RespondSuccess(ctx, res)
+}
+
+// 更新文章
+func (a *ArticleAPI) UpdateArticle(ctx *gin.Context) {
+	idStr := ctx.Param("id")
+	articleID, err := strconv.Atoi(idStr)
+	if err != nil {
+		utils.RespondError(ctx, http.StatusBadRequest, err.Error())
+		return
+	}
+	var req dto.UpdateArticleRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		utils.RespondError(ctx, http.StatusBadRequest, err.Error())
+		return
+	}
+	userID := ctx.MustGet("userID").(uint)
+	res, err := a.articleService.UpdateArticle(uint(articleID), userID, req)
+	if err != nil {
+		utils.RespondError(ctx, http.StatusInternalServerError, err.Error())
+		return
+	}
+	utils.RespondSuccess(ctx, res)
+}
+
+// 删除文章
+func (a *ArticleAPI) DeleteArticle(ctx *gin.Context) {
+	idStr := ctx.Param("id")
+	articleID, err := strconv.Atoi(idStr)
+	if err != nil {
+		utils.RespondError(ctx, http.StatusBadRequest, err.Error())
+		return
+	}
+	userID := ctx.MustGet("userID").(uint)
+	res, err := a.articleService.DeleteArticle(uint(articleID), userID)
+	if err != nil {
+		utils.RespondError(ctx, http.StatusInternalServerError, err.Error())
+		return
+	}
+	utils.RespondSuccess(ctx, res)
 }

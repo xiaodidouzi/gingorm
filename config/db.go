@@ -1,8 +1,8 @@
 package config
 
 import (
-	"awesomeProject/global"
-	"awesomeProject/models"
+	"gingorm/global"
+	"gingorm/models"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"log"
@@ -23,5 +23,5 @@ func InitDB() {
 	sqlDB.SetMaxOpenConns(AppConfig.Database.MaxOpenConns)
 	sqlDB.SetConnMaxLifetime(time.Hour)
 	global.DB = db
-	_ = global.DB.AutoMigrate(&models.User{}, &models.Article{}, &models.ExchangeRate{}, &models.Like{})
+	_ = global.DB.AutoMigrate(&models.User{}, &models.Article{}, &models.Comment{}, &models.Like{})
 }

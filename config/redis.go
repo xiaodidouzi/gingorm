@@ -1,8 +1,8 @@
 package config
 
 import (
-	"awesomeProject/global"
 	"context"
+	"gingorm/global"
 	"github.com/go-redis/redis/v8"
 	"log"
 )

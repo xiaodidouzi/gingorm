@@ -1,61 +1,64 @@
 package router
 
 import (
-	v1 "awesomeProject/api/v1"
-	v2 "awesomeProject/api/v2"
-	"awesomeProject/middlewares"
-	"github.com/gin-contrib/cors"
+	v1 "gingorm/api/v1"
+	"gingorm/kafka"
+	"gingorm/middlewares"
+	"gingorm/service"
 	"github.com/gin-gonic/gin"
-	"time"
+	"gorm.io/gorm"
 )
 
-func SetupRouter() *gin.Engine {
+import (
+	"github.com/go-redis/redis/v8"
+)
+
+// 初始化路由
+// 注册 service
+// 注册 API
+// API 分组
+// 用户模块
+// 认证中间件
+// 文章模块
+// 评论作为文章子资源
+func SetupRouter(db *gorm.DB, rdb *redis.Client, producer *kafka.Producer) *gin.Engine {
 	r := gin.Default()
-	r.Use(middlewares.LoggerMiddleware())
-	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"https://localhost:5173"},
-		AllowMethods:     []string{"GET", "POST", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
-		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,
-		//AllowOriginFunc: func(origin string) bool {
-		//	return origin == "https://"
-		//},
-		MaxAge: 12 * time.Hour,
-	}))
-	// v1 auth
-	auth := r.Group("/api/v1/auth")
+	// 注册 service
+	userService := service.NewUserService(db, rdb)
+	articleService := service.NewArticleService(db, rdb)
+	commentService := service.NewCommentService(db, rdb)
+	likeService := service.NewLikeService(db, rdb, producer)
+	// 注册 API
+	userAPI := v1.NewUserAPI(userService)
+	articleAPI := v1.NewArticleAPI(articleService)
+	commentAPI := v1.NewCommentAPI(commentService)
+	likeAPI := v1.NewLikeAPI(likeService)
+
+	api := r.Group("/api/v1")
+
+	userGroup := api.Group("/user")
 	{
-		auth.POST("/login", v1.Login)
-		auth.POST("/register", v1.Register)
+		userGroup.POST("/register", userAPI.Register)
+		userGroup.POST("/login", userAPI.Login)
 	}
-	// v1 article
-	article := r.Group("api/v1/articles")
+	auth := middlewares.AuthMiddleWare()
+	articleGroup := api.Group("/article")
 	{
-		article.POST("", v1.CreateArticle)
-		article.GET("/:id", v1.GetArticleByID)
-		article.GET("", v1.GetArticle)
-		like := article.Group("/:id/like")
-		{
-			like.POST("", v1.LikeArticle)
-			like.GET("", v1.GetArticleLikes)
-		}
+		articleGroup.POST("", auth, articleAPI.CreateArticle)
+		articleGroup.GET("/:id", articleAPI.GetArticle)
+		articleGroup.GET("", articleAPI.ListArticles)
+		articleGroup.PUT("/:id", auth, articleAPI.UpdateArticle)
+		articleGroup.DELETE("/:id", auth, articleAPI.DeleteArticle)
+
+		articleGroup.POST("/:id/comments", auth, commentAPI.CreateComment)
+		articleGroup.GET("/:id/comments", commentAPI.ListComments)
+		articleGroup.DELETE("/:id/comments/:comment_id", auth, commentAPI.DeleteComment)
 	}
-	//v2 article likes kafka
-	v2Article := r.Group("api/v2/articles")
-	v2Article.Use(middlewares.AuthMiddleWare())
+
+	likeGroup := api.Group("/like")
 	{
-		v2Article.POST("/:id/like", v2.LikeArticle)
-	}
-	// v1 exchange rates
-	exchange := r.Group("/api/v1/exchangeRates")
-	{
-		exchange.GET("", v1.GetExchange)
-		// 需要鉴权
-		exchangeAuth := exchange.Use(middlewares.AuthMiddleWare())
-		{
-			exchangeAuth.POST("", v1.CreateExchangeRate)
-		}
+		likeGroup.POST("", auth, likeAPI.Like)
+		//likeGroup.GET("/count", likeAPI.GetLikeCount)
 	}
 	return r
 }
