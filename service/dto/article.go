@@ -9,10 +9,12 @@ type CreateArticleRequest struct {
 
 // 创建文章响应 DTO
 type CreateArticleResponse struct {
-	ID        uint   `json:"id"`
-	Title     string `json:"title"`
-	AuthorID  uint   `json:"author_id"`
-	CreatedAt string `json:"created_at"`
+	ID         uint   `json:"id"`
+	Title      string `json:"title"`
+	AuthorID   uint   `json:"author_id"`
+	CreatedAt  string `json:"created_at"`
+	AuditState string `json:"audit_state"`
+	Reason     string `json:"reason"`
 }
 
 // 获取文章详情响应 DTO

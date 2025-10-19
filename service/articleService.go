@@ -23,22 +23,28 @@ func NewArticleService(db *gorm.DB, rdb *redis.Client) *ArticleService {
 
 // 创建文章
 func (s *ArticleService) CreateArticle(req dto.CreateArticleRequest, authorID uint) (*dto.CreateArticleResponse, error) {
-	//保存到数据库
+
 	article := models.Article{
-		Title:    req.Title,
-		Content:  req.Content,
-		AuthorID: authorID,
-		Category: req.Category,
+		Title:      req.Title,
+		Content:    req.Content,
+		AuthorID:   authorID,
+		Category:   req.Category,
+		AuditState: "pending",
 	}
-	if err := global.DB.Create(&article).Error; err != nil {
+
+	if err := s.DB.Create(&article).Error; err != nil {
 		return nil, err
 	}
+
 	res := &dto.CreateArticleResponse{
-		ID:        article.ID,
-		Title:     article.Title,
-		AuthorID:  article.AuthorID,
-		CreatedAt: article.CreatedAt.Format("2006-01-02 15:04:05"),
+		ID:         article.ID,
+		Title:      article.Title,
+		AuthorID:   article.AuthorID,
+		CreatedAt:  article.CreatedAt.Format("2006-01-02 15:04:05"),
+		AuditState: article.AuditState,
+		Reason:     article.Reason,
 	}
+
 	return res, nil
 }
 
@@ -174,16 +180,3 @@ func (s *ArticleService) DeleteArticle(articleID, userID uint) (string, error) {
 	}
 	return "删除成功", nil
 }
-
-//// 更新文章点赞数
-//func (s *ArticleService) UpdateLikeCount(articleID uint, delta int64) error {
-//	//数据库原子操作
-//	return global.DB.Model(&models.Article{}).Where("id = ?", articleID).
-//		UpdateColumn("like_count", gorm.Expr("like_count + ?", delta)).Error
-//}
-//
-//// 更新文章评论数
-//func (s *ArticleService) UpdateCommentCount(articleID uint, delta int64) error {
-//	return global.DB.Model(&models.Article{}).Where("id = ?", articleID).
-//		UpdateColumn("comment_count", gorm.Expr("comment_count + ?", delta)).Error
-//}

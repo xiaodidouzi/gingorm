@@ -8,7 +8,8 @@ type Article struct {
 	Content      string `gorm:"type:text;not null" json:"content" binding:"required"`
 	AuthorID     uint   `gorm:"not null;index" json:"author_id"` //外键
 	Category     string `gorm:"type:varchar(50)" json:"category"`
-	Summary      string `gorm:"type:varchar(500)" json:"summary"`
+	AuditState   string `gorm:"type:varchar(20);default:'pending'" json:"audit_state"`
+	Reason       string `gorm:"type:text" json:"reason"`
 	LikeCount    int64  `gorm:"default:0" json:"like_count"`
 	CommentCount int64  `gorm:"default:0" json:"comment_count"`
 }

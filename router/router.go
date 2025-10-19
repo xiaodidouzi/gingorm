@@ -13,15 +13,7 @@ import (
 	"github.com/go-redis/redis/v8"
 )
 
-// 初始化路由
-// 注册 service
-// 注册 API
-// API 分组
-// 用户模块
-// 认证中间件
-// 文章模块
-// 评论作为文章子资源
-func SetupRouter(db *gorm.DB, rdb *redis.Client, producer *kafka.Producer) *gin.Engine {
+func SetupRouter(db *gorm.DB, rdb *redis.Client, producer *kafka.LikeProducer) *gin.Engine {
 	r := gin.Default()
 	// 注册 service
 	userService := service.NewUserService(db, rdb)

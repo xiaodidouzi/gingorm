@@ -3,42 +3,48 @@ package kafka
 import (
 	"context"
 	"encoding/json"
-	"errors"
-	"github.com/IBM/sarama"
+	"gingorm/service/dto"
+	kafkago "github.com/segmentio/kafka-go"
 	"log"
+	"time"
 )
 
-type Producer struct {
-	asyncProducer sarama.AsyncProducer
-	topic         string
+type LikeProducer struct {
+	writer *kafkago.Writer
 }
 
-func NewProducer(brokers []string, topic string) (*Producer, error) {
-	config := sarama.NewConfig()
-	config.Producer.Return.Successes = false
-	config.Producer.RequiredAcks = sarama.WaitForLocal
-	producer, err := sarama.NewAsyncProducer(brokers, config)
-	if err != nil {
-		return nil, err
+func NewLikeProducer(brokers []string, topic string) *LikeProducer {
+	return &LikeProducer{
+		writer: &kafkago.Writer{
+			Addr:         kafkago.TCP(brokers...),
+			Topic:        topic,
+			Balancer:     &kafkago.LeastBytes{},
+			BatchSize:    1,
+			BatchTimeout: 10 * time.Millisecond,
+		},
 	}
-
-	return &Producer{asyncProducer: producer, topic: topic}, nil
 }
 
-func (p *Producer) SendMessage(ctx context.Context, msg interface{}) error {
+func (p *LikeProducer) SendLike(msg dto.LikeMessage) {
 	data, err := json.Marshal(msg)
 	if err != nil {
-		return err
+		log.Printf("[Producer] JSON marshal error: %v", err)
+		return
 	}
 
-	select {
-	case p.asyncProducer.Input() <- &sarama.ProducerMessage{
-		Topic: p.topic,
-		Value: sarama.ByteEncoder(data),
-	}:
-		log.Printf("[INFO] Kafka message sent: %+v", msg)
-		return nil
-	case <-ctx.Done():
-		return errors.New("send kafka message canceled or timeout: " + ctx.Err().Error())
+	err = p.writer.WriteMessages(context.Background(),
+		kafkago.Message{
+			Key:   []byte(msg.Action),
+			Value: data,
+		},
+	)
+	if err != nil {
+		log.Printf("[Producer] send message failed: %v", err)
+	}
+}
+
+func (p *LikeProducer) Close() {
+	if err := p.writer.Close(); err != nil {
+		log.Printf("[Producer] close error: %v", err)
 	}
 }

@@ -5,27 +5,28 @@ import (
 	"gingorm/global"
 	"gingorm/kafka"
 	"gingorm/router"
-	"log"
 )
 
 func main() {
 	config.InitConfig()
-	//kafka.InitKafkaWriter([]string{"localhost:9092"}, "like-topic")
-	//defer kafka.CloseKafkaWriter()
-	brokers := []string{"localhost:9092"} // Kafka broker 地址
+
+	global.DB = config.InitDB()
+	global.RedisDB = config.InitRedis()
+
+	brokers := []string{"localhost:9092"}
 	topic := "like_events"
-	producer, err := kafka.NewProducer(brokers, topic)
-	if err != nil {
-		log.Fatalf("failed to create kafka producer: %v", err)
-	}
-	go func() {
-		c := kafka.NewLikeConsumer(global.DB, topic)
-		if err := c.Start(brokers); err != nil {
-			log.Fatalf("Kafka consumer failed: %v", err)
-		}
-	}()
+	groupID := "like_group"
+
+	// Kafka Producer
+	producer := kafka.NewLikeProducer(brokers, topic)
+	defer producer.Close()
+
+	// Kafka Consumer
+	consumer := kafka.NewLikeConsumer(global.DB, brokers, topic, groupID)
+	go consumer.Start()
+	defer consumer.Close()
+
+	// 启动 HTTP 服务
 	r := router.SetupRouter(global.DB, global.RedisDB, producer)
-	//tasks.StartLikesSyncTicker()
-	//go kafka.StartLikeConsumer([]string{"localhost:9092"}, "like-topic", "like-group")
 	r.Run(":8080")
 }

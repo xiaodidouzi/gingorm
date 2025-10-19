@@ -15,3 +15,6 @@ redis:
 jwt:
   secret: "secret"
   expire: 86400
+google_ai:
+  apikey: "AIzaSyDpiCSLvcKLKqnd5GMFRxOup6qc3hTayRA"
+  modelname: "gemini-2.5-flash"
